@@ -45,7 +45,7 @@ uv add "rate-optimiser[stochastic]"
 From source with uv:
 
 ```bash
-git clone https://github.com/burning-cost/rate-optimiser
+git clone https://github.com/burningcost/rate-optimiser
 cd rate-optimiser
 uv sync --extra dev
 ```
@@ -237,7 +237,7 @@ The efficient frontier is traced by solving this problem for a range of `LR_targ
 ## Development
 
 ```bash
-git clone https://github.com/burning-cost/rate-optimiser
+git clone https://github.com/burningcost/rate-optimiser
 cd rate-optimiser
 uv sync --extra dev
 uv run pytest -v
