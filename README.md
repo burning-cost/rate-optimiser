@@ -33,13 +33,13 @@ This library solves those three questions formally. You specify constraints, it 
 ## Installation
 
 ```bash
-uv pip install rate-optimiser
+uv add rate-optimiser
 ```
 
 With stochastic module (requires cvxpy):
 
 ```bash
-uv pip install "rate-optimiser[stochastic]"
+uv add "rate-optimiser[stochastic]"
 ```
 
 From source with uv:
@@ -55,7 +55,7 @@ uv sync --extra dev
 ## Quick start
 
 ```python
-import pandas as pd
+import polars as pl
 from rate_optimiser import (
     PolicyData, FactorStructure, DemandModel,
     RateChangeOptimiser, EfficientFrontier,
@@ -68,14 +68,14 @@ from rate_optimiser.demand import make_logistic_demand, LogisticDemandParams
 #    Required columns: policy_id, channel, renewal_flag,
 #    technical_premium, current_premium
 #    Your demand model populates renewal_prob
-df = pd.read_parquet("policies.parquet")
+df = pl.read_parquet("policies.parquet")
 data = PolicyData(df)
 
 # 2. Factor structure - describes the multiplicative tariff
 factor_names = ["f_age_band", "f_ncb", "f_vehicle_group", "f_region", "f_tenure_discount"]
 fs = FactorStructure(
     factor_names=factor_names,
-    factor_values=df[factor_names],   # current relativity values per policy
+    factor_values=df.select(factor_names),   # current relativity values per policy
     renewal_factor_names=["f_tenure_discount"],  # renewal-only; ENBP-relevant
 )
 
@@ -140,21 +140,21 @@ The `shadow_lr` column is the Lagrange multiplier on the LR constraint: the marg
 
 ## Stochastic formulation (Branda approach)
 
-The deterministic constraint E[LR] ≤ target uses point estimates of claims. The stochastic formulation requires P(LR ≤ target) ≥ α - the LR must stay below the target with confidence level α.
+The deterministic constraint E[LR] <= target uses point estimates of claims. The stochastic formulation requires P(LR <= target) >= alpha - the LR must stay below the target with confidence level alpha.
 
 Reformulated via normal approximation (appropriate for large books):
 
 ```
-E[LR] + z_α × σ[LR] ≤ target
+E[LR] + z_alpha * sigma[LR] <= target
 ```
 
-where σ[LR] comes from the GLM's variance estimates.
+where sigma[LR] comes from the GLM's variance estimates.
 
 ```python
 from rate_optimiser.stochastic import ClaimsVarianceModel, StochasticRateOptimiser
 
 variance_model = ClaimsVarianceModel.from_tweedie(
-    mean_claims=data.df["technical_premium"].values,
+    mean_claims=data.df["technical_premium"].to_numpy(),
     dispersion=1.2,  # from your Tweedie GLM summary
     power=1.5,
 )
@@ -168,7 +168,7 @@ opt = StochasticRateOptimiser(
 result = opt.solve()
 ```
 
-The stochastic solver will recommend a higher rate than the deterministic one because it must maintain the LR constraint with high probability, not just in expectation. The difference between the two solutions quantifies the "uncertainty premium" in the rate strategy.
+The stochastic solver will recommend a higher rate than the deterministic one because it must maintain the LR constraint with high probability, not just in expectation. The difference between the two solutions quantifies the uncertainty premium in the rate strategy.
 
 ---
 
@@ -187,7 +187,7 @@ The NB-equivalent is computed by applying all factor adjustments excluding renew
 ```python
 fs = FactorStructure(
     factor_names=["f_age_band", "f_ncb", "f_tenure_discount"],
-    factor_values=df[["f_age_band", "f_ncb", "f_tenure_discount"]],
+    factor_values=df.select(["f_age_band", "f_ncb", "f_tenure_discount"]),
     renewal_factor_names=["f_tenure_discount"],  # excluded from NB equivalent
 )
 ```
@@ -200,10 +200,10 @@ fs = FactorStructure(
 - **Efficient frontier tracing.** Parametric sweep over LR targets, returning the full (LR, volume) tradeoff surface with shadow prices at each point.
 - **Shadow prices on all constraints.** Lagrange multipliers extracted from the SLSQP solution. Tells you which constraints are binding and at what cost.
 - **FCA PS21/5 ENBP constraint.** Channel-aware, renewal-only factor aware. Not available in any other open-source tool.
-- **Stochastic chance-constrained formulation.** Branda (2013) approach: P(LR ≤ target) ≥ α using GLM variance estimates.
+- **Stochastic chance-constrained formulation.** Branda (2013) approach: P(LR <= target) >= alpha using GLM variance estimates.
 - **sklearn-compatible demand model interface.** Pass any sklearn estimator or a simple callable.
 - **Feasibility reporting.** Before running the solver, check whether your constraints are satisfiable at current rates.
-- **Multiple objective functions.** Minimum dislocation (||m-1||²), premium-weighted dislocation, minimum absolute dislocation.
+- **Multiple objective functions.** Minimum dislocation (||m-1||^2), premium-weighted dislocation, minimum absolute dislocation.
 
 ---
 
@@ -212,16 +212,16 @@ fs = FactorStructure(
 The optimisation problem:
 
 ```
-minimise   Σ_k (m_k - 1)²
-subject to E[LR(m)] ≤ LR_target
-           E[vol_ratio(m)] ≥ vol_bound
-           m_k ∈ [m_k_min, m_k_max]  for all k
-           π_i^renewal ≤ π_i^NB_equiv  (ENBP)
+minimise   sum_k (m_k - 1)^2
+subject to E[LR(m)] <= LR_target
+           E[vol_ratio(m)] >= vol_bound
+           m_k in [m_k_min, m_k_max]  for all k
+           pi_i^renewal <= pi_i^NB_equiv  (ENBP)
 ```
 
 Decision variables `m_k` are multiplicative adjustments to each rating factor's relativities. A value of 1.05 means factor k's relativities are uniformly scaled up by 5% - a parallel shift on the log scale.
 
-The demand model enters through the volume and LR constraints: `p_i(π_i / π_market_i)` is the probability that policy i renews at the adjusted premium. This makes both constraints nonlinear in `m`, which is why the problem requires SLSQP or a similar nonlinear solver.
+The demand model enters through the volume and LR constraints: `p_i(pi_i / pi_market_i)` is the probability that policy i renews at the adjusted premium. This makes both constraints nonlinear in `m`, which is why the problem requires SLSQP or a similar nonlinear solver.
 
 The efficient frontier is traced by solving this problem for a range of `LR_target` values and collecting the resulting (expected_LR, expected_volume) pairs - directly analogous to the Markowitz frontier construction.
 
@@ -257,7 +257,7 @@ MIT. See [LICENSE](LICENSE).
 
 Issues and pull requests welcome. The priority backlog:
 
-1. Competitive equilibrium module: Lerner index pricing (π* = c + 1/β) as a baseline.
-2. Bayesian demand model integration: propagate posterior uncertainty over β through the optimiser.
+1. Competitive equilibrium module: Lerner index pricing (pi* = c + 1/beta) as a baseline.
+2. Bayesian demand model integration: propagate posterior uncertainty over beta through the optimiser.
 3. Multi-period optimisation: Emms/Haberman (2005) HJB framework for dynamic pricing.
 4. Consumer Duty fair value checker: flag optimised rates that systematically disadvantage protected groups.
