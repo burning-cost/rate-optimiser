@@ -33,13 +33,13 @@ This library solves those three questions formally. You specify constraints, it 
 ## Installation
 
 ```bash
-pip install rate-optimiser
+uv pip install rate-optimiser
 ```
 
 With stochastic module (requires cvxpy):
 
 ```bash
-pip install "rate-optimiser[stochastic]"
+uv pip install "rate-optimiser[stochastic]"
 ```
 
 From source with uv:
@@ -84,7 +84,7 @@ fs = FactorStructure(
 params = LogisticDemandParams(intercept=1.0, price_coef=-2.0, tenure_coef=0.05)
 demand = make_logistic_demand(params)
 #    Or pass any sklearn estimator:
-#    demand = DemandModel(my_xgboost_model, feature_names=["age", "tenure", "ncb"])
+#    demand = DemandModel(my_catboost_model, feature_names=["age", "tenure", "ncb"])
 
 # 4. Configure the optimiser
 opt = RateChangeOptimiser(data=data, demand=demand, factor_structure=fs)
