@@ -12,7 +12,7 @@ demand model. The data is constructed so that:
 The demand model uses beta = -2.0 (price semi-elasticity), within the -1.5 to -3.0
 range cited for UK motor PCW, and includes a tenure effect. Crucially, the demand
 model used in the optimiser must produce the same probabilities as the stored
-``renewal_prob`` column when called at the identity adjustment — otherwise the
+``renewal_prob`` column when called at the identity adjustment - otherwise the
 volume ratio at the starting point is not 1.0 and constraint bounds become confusing.
 """
 
@@ -171,7 +171,7 @@ def basic_optimiser(policy_data, demand_model, factor_structure) -> RateChangeOp
 
 @pytest.fixture
 def unconstrained_optimiser(policy_data, demand_model, factor_structure) -> RateChangeOptimiser:
-    """Optimiser with only factor bounds — no LR or volume constraint."""
+    """Optimiser with only factor bounds - no LR or volume constraint."""
     opt = RateChangeOptimiser(
         data=policy_data,
         demand=demand_model,

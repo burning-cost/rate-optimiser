@@ -335,7 +335,7 @@ class ENBPConstraint(Constraint):
         renewal_premiums = current_premiums[policy_mask] * renewal_adj_product
 
         # NB-equivalent premium: exclude renewal-only factor adjustments.
-        # For renewal-only factors, revert to 1.0 (no adjustment — NB doesn't get
+        # For renewal-only factors, revert to 1.0 (no adjustment - NB doesn't get
         # the renewal-specific discount).
         nb_adj = adjustments.copy()
         renewal_factor_indices = [

@@ -66,7 +66,7 @@ class TestRateChangeOptimiser:
         if result.success:
             # At least one constraint should bind and have nonzero shadow price
             total_shadow = sum(abs(v) for v in result.shadow_prices.values())
-            # This is a soft assertion — shadow prices depend on solver internals
+            # This is a soft assertion - shadow prices depend on solver internals
             # but we verify the dict is populated
             assert isinstance(total_shadow, float)
 

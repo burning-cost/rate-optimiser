@@ -16,7 +16,7 @@ The logistic form is the industry default (see Guven & McPhail 2013, CAS):
 
 where β is the price semi-elasticity (typically negative, around -1.5 to -3.0
 for UK motor PCW). This class supports both this parametric form and arbitrary
-callables, so teams with XGBoost or neural-net demand models can plug them in.
+callables, so teams with CatBoost, XGBoost, or neural-net demand models can plug them in.
 """
 
 from __future__ import annotations

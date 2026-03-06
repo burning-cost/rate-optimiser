@@ -13,7 +13,7 @@ Under the assumption that aggregate losses are approximately normally distribute
 where z_alpha is the normal quantile at confidence level alpha, and sigma[LR]
 is the standard deviation of the portfolio loss ratio given the rate strategy.
 
-This formulation requires variance estimates for expected claims — available
+This formulation requires variance estimates for expected claims - available
 from any GLM with an overdispersion parameter (Tweedie, negative binomial,
 quasi-Poisson) or from a cell-level claim count model.
 

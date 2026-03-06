@@ -10,7 +10,7 @@ against expected LR.
 The frontier tells the pricing team the full set of achievable outcomes, not
 just a single recommended strategy. The shadow price on the LR constraint at
 each frontier point is the marginal cost (in volume) of a one-percentage-point
-improvement in LR — a number that belongs in the conversation with commercial
+improvement in LR - a number that belongs in the conversation with commercial
 directors.
 
 See section 5.5 of the implementation blueprint for the algorithm design.
@@ -34,7 +34,7 @@ class EfficientFrontier:
 
     Sweeps over a range of loss ratio targets, solving the constrained
     optimisation at each point. The result is a DataFrame describing the
-    Pareto-optimal set of rate strategies — strategies where you cannot
+    Pareto-optimal set of rate strategies - strategies where you cannot
     improve LR without sacrificing volume.
 
     Parameters

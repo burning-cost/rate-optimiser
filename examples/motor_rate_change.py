@@ -1,12 +1,12 @@
 """
-Motor rate change optimisation — worked example.
+Motor rate change optimisation - worked example.
 
 This script demonstrates end-to-end use of rate-optimiser on a synthetic UK
 motor book. It mirrors the kind of rate review cycle a pricing team would run
 quarterly: start with GLM outputs, add demand model predictions, set constraints,
 solve, and trace the efficient frontier.
 
-The synthetic data is deliberately simplified — five rating factors, 200 policies,
+The synthetic data is deliberately simplified - five rating factors, 200 policies,
 a clean logistic demand model. In production you would replace this with your
 actual GLM and demand model outputs.
 
@@ -203,7 +203,7 @@ stoc_opt.add_constraint(FactorBoundsConstraint(lower=0.90, upper=1.15, n_factors
 stoc_result = stoc_opt.solve()
 print(f"Stochastic result (alpha=0.95):\n{stoc_result.summary()}")
 
-print("\nComparison — deterministic vs. stochastic LR target at 72%:")
+print("\nComparison - deterministic vs. stochastic LR target at 72%:")
 print(f"  Deterministic expected LR: {result.expected_lr:.4f}")
 print(f"  Stochastic expected LR:    {stoc_result.expected_lr:.4f}")
 det_total = sum(result.factor_adjustments.values())

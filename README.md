@@ -16,7 +16,7 @@ A UK motor pricing team wants to take +3.5% rate on renewal. Before submitting t
 2. Does the proposed strategy hit the LR target without breaching the volume budget?
 3. Is the renewal price compliant with FCA PS21/5 (no renewal exceeds NB equivalent)?
 
-Current tooling forces them to hand-code scenarios in Excel or run ad hoc simulations. The efficient frontier — the full set of achievable (LR, volume) outcomes — is never computed. Shadow prices on constraints (what is a 1pp LR improvement actually worth in volume terms?) are unknown.
+Current tooling forces them to hand-code scenarios in Excel or run ad hoc simulations. The efficient frontier - the full set of achievable (LR, volume) outcomes - is never computed. Shadow prices on constraints (what is a 1pp LR improvement actually worth in volume terms?) are unknown.
 
 This library solves those three questions formally. You specify constraints, it finds the minimum-dislocation rate strategy that satisfies them, and it maps the entire frontier so you can see what trade-offs you are making.
 
@@ -71,7 +71,7 @@ from rate_optimiser.demand import make_logistic_demand, LogisticDemandParams
 df = pd.read_parquet("policies.parquet")
 data = PolicyData(df)
 
-# 2. Factor structure — describes the multiplicative tariff
+# 2. Factor structure - describes the multiplicative tariff
 factor_names = ["f_age_band", "f_ncb", "f_vehicle_group", "f_region", "f_tenure_discount"]
 fs = FactorStructure(
     factor_names=factor_names,
@@ -79,7 +79,7 @@ fs = FactorStructure(
     renewal_factor_names=["f_tenure_discount"],  # renewal-only; ENBP-relevant
 )
 
-# 3. Demand model — wrap your logistic model or any callable
+# 3. Demand model - wrap your logistic model or any callable
 #    This form: logit(p) = intercept + beta * log(price_ratio) + tenure_coef * tenure
 params = LogisticDemandParams(intercept=1.0, price_coef=-2.0, tenure_coef=0.05)
 demand = make_logistic_demand(params)
@@ -134,13 +134,13 @@ print(frontier.shadow_price_summary())
       0.68        0.680            0.937       0.72           0.08
 ```
 
-The `shadow_lr` column is the Lagrange multiplier on the LR constraint: the marginal dislocation cost of a one-unit tightening of the target. A rising shadow price signals you are approaching the frontier's knee — the point where further LR improvement costs disproportionate volume. That is a number worth putting in front of a commercial director.
+The `shadow_lr` column is the Lagrange multiplier on the LR constraint: the marginal dislocation cost of a one-unit tightening of the target. A rising shadow price signals you are approaching the frontier's knee - the point where further LR improvement costs disproportionate volume. That is a number worth putting in front of a commercial director.
 
 ---
 
 ## Stochastic formulation (Branda approach)
 
-The deterministic constraint E[LR] ≤ target uses point estimates of claims. The stochastic formulation requires P(LR ≤ target) ≥ α — the LR must stay below the target with confidence level α.
+The deterministic constraint E[LR] ≤ target uses point estimates of claims. The stochastic formulation requires P(LR ≤ target) ≥ α - the LR must stay below the target with confidence level α.
 
 Reformulated via normal approximation (appropriate for large books):
 
@@ -180,7 +180,7 @@ PS21/5 prohibits renewal premiums above the NB equivalent through the same chann
 opt.add_constraint(ENBPConstraint(channels=["PCW", "direct"]))
 ```
 
-The constraint is channel-specific, as the regulation requires. The shadow price tells you the cost (in objective terms) of the regulatory constraint — how much additional dislocation the insurer incurs to comply. This is directly relevant to PS21/5 impact analyses.
+The constraint is channel-specific, as the regulation requires. The shadow price tells you the cost (in objective terms) of the regulatory constraint - how much additional dislocation the insurer incurs to comply. This is directly relevant to PS21/5 impact analyses.
 
 The NB-equivalent is computed by applying all factor adjustments excluding renewal-only factors (e.g., tenure discounts, NCB-at-renewal). Declare renewal-only factors in the `FactorStructure`:
 
@@ -219,11 +219,11 @@ subject to E[LR(m)] ≤ LR_target
            π_i^renewal ≤ π_i^NB_equiv  (ENBP)
 ```
 
-Decision variables `m_k` are multiplicative adjustments to each rating factor's relativities. A value of 1.05 means factor k's relativities are uniformly scaled up by 5% — a parallel shift on the log scale.
+Decision variables `m_k` are multiplicative adjustments to each rating factor's relativities. A value of 1.05 means factor k's relativities are uniformly scaled up by 5% - a parallel shift on the log scale.
 
 The demand model enters through the volume and LR constraints: `p_i(π_i / π_market_i)` is the probability that policy i renews at the adjusted premium. This makes both constraints nonlinear in `m`, which is why the problem requires SLSQP or a similar nonlinear solver.
 
-The efficient frontier is traced by solving this problem for a range of `LR_target` values and collecting the resulting (expected_LR, expected_volume) pairs — directly analogous to the Markowitz frontier construction.
+The efficient frontier is traced by solving this problem for a range of `LR_target` values and collecting the resulting (expected_LR, expected_volume) pairs - directly analogous to the Markowitz frontier construction.
 
 ### Academic foundations
 

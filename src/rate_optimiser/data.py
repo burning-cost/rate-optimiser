@@ -2,7 +2,7 @@
 Data layer: PolicyData and FactorStructure.
 
 PolicyData holds the policy-level inputs the optimiser operates on. FactorStructure
-describes the multiplicative tariff — which rating factors exist and which factor
+describes the multiplicative tariff - which rating factors exist and which factor
 level applies to each policy. The optimiser's decision variables are adjustments to
 factor relativities within this structure.
 
@@ -108,7 +108,7 @@ class PolicyData:
         Portfolio-level loss ratio at current premiums.
 
         Computed as sum of technical premiums divided by sum of current
-        premiums — i.e., using technical price as a proxy for expected claims.
+        premiums - i.e., using technical price as a proxy for expected claims.
         Actual loss ratio requires realised claims data.
         """
         return float(
@@ -302,7 +302,7 @@ class FactorStructure:
         )
 
     def initial_adjustments(self) -> np.ndarray:
-        """Return an array of ones — the identity (no change) adjustment."""
+        """Return an array of ones - the identity (no change) adjustment."""
         return np.ones(self.n_factors)
 
     def __repr__(self) -> str:

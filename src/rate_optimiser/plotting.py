@@ -2,7 +2,7 @@
 Plotting utilities for rate optimisation outputs.
 
 All functions return matplotlib Axes objects, so callers can further customise.
-No inline plt.show() calls — that is the caller's responsibility.
+No inline plt.show() calls - that is the caller's responsibility.
 """
 
 from __future__ import annotations
