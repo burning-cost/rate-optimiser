@@ -37,7 +37,7 @@ from typing import Optional
 import warnings
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from scipy import stats
 
 from rate_optimiser.data import PolicyData, FactorStructure
@@ -188,7 +188,7 @@ class ChanceConstrainedLRConstraint(Constraint):
     def evaluate(
         self,
         adjustments: np.ndarray,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         factor_structure,
         demand_model,
     ) -> float:
@@ -205,7 +205,7 @@ class ChanceConstrainedLRConstraint(Constraint):
     def _compute_lr_moments(
         self,
         adjustments: np.ndarray,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         factor_structure,
         demand_model,
     ) -> tuple[float, float]:
@@ -287,7 +287,7 @@ class StochasticRateOptimiser(RateChangeOptimiser):
     Examples
     --------
     >>> variance_model = ClaimsVarianceModel.from_tweedie(
-    ...     mean_claims=data.df["technical_premium"].values,
+    ...     mean_claims=data.df["technical_premium"].to_numpy(),
     ...     dispersion=1.2,
     ...     power=1.5,
     ... )

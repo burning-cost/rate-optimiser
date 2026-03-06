@@ -16,7 +16,7 @@ from rate_optimiser.optimiser import OptimiserResult
 
 @pytest.fixture
 def variance_model(raw_policy_df):
-    mean_claims = raw_policy_df["technical_premium"].values
+    mean_claims = raw_policy_df["technical_premium"].to_numpy()
     return ClaimsVarianceModel.from_tweedie(mean_claims, dispersion=1.2, power=1.5)
 
 
@@ -38,18 +38,18 @@ def stochastic_optimiser(policy_data, demand_model, factor_structure, variance_m
 
 class TestClaimsVarianceModel:
     def test_from_tweedie_shapes(self, raw_policy_df):
-        mean_claims = raw_policy_df["technical_premium"].values
+        mean_claims = raw_policy_df["technical_premium"].to_numpy()
         model = ClaimsVarianceModel.from_tweedie(mean_claims, dispersion=1.0, power=1.5)
         assert model.mean_claims.shape == mean_claims.shape
         assert model.variance_claims.shape == mean_claims.shape
 
     def test_from_tweedie_variance_positive(self, raw_policy_df):
-        mean_claims = raw_policy_df["technical_premium"].values
+        mean_claims = raw_policy_df["technical_premium"].to_numpy()
         model = ClaimsVarianceModel.from_tweedie(mean_claims, dispersion=1.0, power=1.5)
         assert (model.variance_claims > 0).all()
 
     def test_from_tweedie_higher_dispersion_gives_higher_variance(self, raw_policy_df):
-        mean_claims = raw_policy_df["technical_premium"].values
+        mean_claims = raw_policy_df["technical_premium"].to_numpy()
         m1 = ClaimsVarianceModel.from_tweedie(mean_claims, dispersion=1.0, power=1.5)
         m2 = ClaimsVarianceModel.from_tweedie(mean_claims, dispersion=2.0, power=1.5)
         assert (m2.variance_claims > m1.variance_claims).all()
@@ -57,7 +57,7 @@ class TestClaimsVarianceModel:
     def test_from_overdispersed_poisson(self, raw_policy_df):
         n = len(raw_policy_df)
         counts = np.ones(n) * 0.1
-        severity = raw_policy_df["technical_premium"].values / 0.1
+        severity = raw_policy_df["technical_premium"].to_numpy() / 0.1
         sev_var = severity ** 2 * 0.5
         model = ClaimsVarianceModel.from_overdispersed_poisson(
             expected_counts=counts,
@@ -69,7 +69,7 @@ class TestClaimsVarianceModel:
         assert (model.variance_claims > 0).all()
 
     def test_tweedie_power_affects_variance_shape(self, raw_policy_df):
-        mean_claims = raw_policy_df["technical_premium"].values
+        mean_claims = raw_policy_df["technical_premium"].to_numpy()
         # Higher power: variance scales more steeply with mean
         m1 = ClaimsVarianceModel.from_tweedie(mean_claims, dispersion=1.0, power=1.0)
         m2 = ClaimsVarianceModel.from_tweedie(mean_claims, dispersion=1.0, power=2.0)

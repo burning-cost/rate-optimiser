@@ -22,9 +22,9 @@ callables, so teams with XGBoost or neural-net demand models can plug them in.
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from dataclasses import dataclass
-from typing import Callable, Optional, Protocol, runtime_checkable
+from typing import Callable, Optional, Protocol, Union, runtime_checkable
 
 
 @runtime_checkable
@@ -89,7 +89,7 @@ class DemandModel:
     def predict(
         self,
         price_ratio: np.ndarray,
-        policy_features: Optional[pd.DataFrame] = None,
+        policy_features: Optional[pl.DataFrame] = None,
     ) -> np.ndarray:
         """
         Return renewal/conversion probabilities at the given price ratios.
@@ -99,7 +99,7 @@ class DemandModel:
         price_ratio : np.ndarray
             Shape (n_policies,). Ratio of the candidate premium to market premium.
             Values > 1 mean the insurer is above market; < 1 below market.
-        policy_features : pd.DataFrame, optional
+        policy_features : pl.DataFrame, optional
             Policy-level features required by the model. Must be supplied when
             using an sklearn estimator with ``feature_names``. Not required for
             simple callables.
@@ -116,22 +116,25 @@ class DemandModel:
         else:
             # Raw callable
             if policy_features is not None and self._feature_names:
-                return self._model(price_ratio, policy_features[self._feature_names])
+                return self._model(price_ratio, policy_features.select(self._feature_names))
             return self._model(price_ratio)
 
     def _predict_sklearn(
         self,
         price_ratio: np.ndarray,
-        policy_features: Optional[pd.DataFrame],
+        policy_features: Optional[pl.DataFrame],
     ) -> np.ndarray:
         """Build feature matrix and call predict_proba."""
+        import pandas as pd
+
         if policy_features is None and self._feature_names:
             raise ValueError(
                 "policy_features must be supplied when using an sklearn estimator "
                 f"with feature_names={self._feature_names}"
             )
         if policy_features is not None and self._feature_names:
-            X = policy_features[self._feature_names].copy()
+            # Convert selected Polars columns to pandas for sklearn compatibility
+            X = policy_features.select(self._feature_names).to_pandas()
             X[self._price_ratio_col] = price_ratio
         else:
             X = pd.DataFrame({self._price_ratio_col: price_ratio})
@@ -144,7 +147,7 @@ class DemandModel:
     def elasticity_at(
         self,
         price_ratio: np.ndarray,
-        policy_features: Optional[pd.DataFrame] = None,
+        policy_features: Optional[pl.DataFrame] = None,
         delta: float = 0.01,
     ) -> np.ndarray:
         """
@@ -157,7 +160,7 @@ class DemandModel:
         ----------
         price_ratio : np.ndarray
             Shape (n_policies,). Reference price ratios.
-        policy_features : pd.DataFrame, optional
+        policy_features : pl.DataFrame, optional
             Policy features (passed through to predict).
         delta : float
             Relative step size for finite differences. Default 0.01 (1%).
@@ -233,11 +236,11 @@ def make_logistic_demand(params: Optional[LogisticDemandParams] = None) -> Deman
     price_coef = params.price_coef
     tenure_coef = params.tenure_coef
 
-    def _logistic(price_ratio: np.ndarray, features: Optional[pd.DataFrame] = None) -> np.ndarray:
+    def _logistic(price_ratio: np.ndarray, features: Optional[pl.DataFrame] = None) -> np.ndarray:
         log_ratio = np.log(np.clip(price_ratio, 1e-6, 10.0))
         linear = intercept + price_coef * log_ratio
         if features is not None and "tenure" in features.columns:
-            linear = linear + tenure_coef * features["tenure"].values
+            linear = linear + tenure_coef * features["tenure"].to_numpy()
         return expit(linear)
 
     return DemandModel(_logistic, feature_names=["tenure"])

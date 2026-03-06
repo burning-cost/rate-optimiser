@@ -19,7 +19,7 @@ volume ratio at the starting point is not 1.0 and constraint bounds become confu
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
 from scipy.special import expit
 
@@ -47,7 +47,7 @@ def rng() -> np.random.Generator:
 
 
 @pytest.fixture(scope="session")
-def raw_policy_df(rng) -> pd.DataFrame:
+def raw_policy_df(rng) -> pl.DataFrame:
     """Synthetic motor policy DataFrame."""
     n = N_POLICIES
 
@@ -85,21 +85,21 @@ def raw_policy_df(rng) -> pd.DataFrame:
     logit = INTERCEPT + PRICE_COEF * np.log(price_ratio) + TENURE_COEF * tenure
     renewal_prob = expit(logit)
 
-    df = pd.DataFrame({
+    df = pl.DataFrame({
         "policy_id": [f"POL{i:04d}" for i in range(n)],
-        "channel": channel,
-        "renewal_flag": renewal_flag,
-        "technical_premium": technical_premium,
-        "current_premium": current_premium,
-        "market_premium": market_premium,
-        "renewal_prob": renewal_prob,
-        "tenure": tenure,
+        "channel": channel.tolist(),
+        "renewal_flag": renewal_flag.tolist(),
+        "technical_premium": technical_premium.tolist(),
+        "current_premium": current_premium.tolist(),
+        "market_premium": market_premium.tolist(),
+        "renewal_prob": renewal_prob.tolist(),
+        "tenure": tenure.tolist(),
         # Store factor relativities as columns
-        "factor_age_band": age_band,
-        "factor_ncb": ncb,
-        "factor_vehicle_group": vehicle_group,
-        "factor_region": region,
-        "factor_tenure_discount": np.full(n, 1.0),  # renewal-only factor (currently neutral)
+        "factor_age_band": age_band.tolist(),
+        "factor_ncb": ncb.tolist(),
+        "factor_vehicle_group": vehicle_group.tolist(),
+        "factor_region": region.tolist(),
+        "factor_tenure_discount": [1.0] * n,
     })
 
     return df
@@ -125,7 +125,7 @@ def factor_names() -> list[str]:
 def factor_structure(raw_policy_df, factor_names) -> FactorStructure:
     return FactorStructure(
         factor_names=factor_names,
-        factor_values=raw_policy_df[factor_names],
+        factor_values=raw_policy_df.select(factor_names),
         renewal_factor_names=["factor_tenure_discount"],
     )
 
@@ -147,7 +147,7 @@ def demand_model() -> DemandModel:
         log_ratio = np.log(np.clip(price_ratio, 1e-6, 10.0))
         linear = intercept + price_coef * log_ratio
         if features is not None and "tenure" in features.columns:
-            linear = linear + tenure_coef * features["tenure"].values
+            linear = linear + tenure_coef * features["tenure"].to_numpy()
         return expit(linear)
 
     return DemandModel(_logistic, feature_names=["tenure"])

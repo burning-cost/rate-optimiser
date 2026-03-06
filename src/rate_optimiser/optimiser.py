@@ -32,7 +32,7 @@ from typing import Optional, Callable, Literal
 import warnings
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from scipy.optimize import minimize, OptimizeResult
 
 from rate_optimiser.data import PolicyData, FactorStructure
@@ -301,7 +301,7 @@ class RateChangeOptimiser:
             raw_result=raw,
         )
 
-    def _build_objective(self, df: pd.DataFrame) -> Callable:
+    def _build_objective(self, df: pl.DataFrame) -> Callable:
         """Build the objective function closure."""
         objective_type = self._objective
 
@@ -310,9 +310,9 @@ class RateChangeOptimiser:
                 return float(np.sum((adj - 1.0) ** 2))
 
         elif objective_type == "min_weighted_dislocation":
-            total_premium = df["current_premium"].sum()
+            total_premium = df["current_premium"].to_numpy().sum()
             factor_premiums = np.array([
-                df["current_premium"].sum() / self.n_factors
+                df["current_premium"].to_numpy().sum() / self.n_factors
                 for _ in range(self.n_factors)
             ])
 
@@ -352,7 +352,7 @@ class RateChangeOptimiser:
 
         return shadow
 
-    def feasibility_report(self, adjustments: Optional[np.ndarray] = None) -> pd.DataFrame:
+    def feasibility_report(self, adjustments: Optional[np.ndarray] = None) -> pl.DataFrame:
         """
         Evaluate all constraints at the given (or current) adjustments.
 
@@ -365,7 +365,7 @@ class RateChangeOptimiser:
 
         Returns
         -------
-        pd.DataFrame
+        pl.DataFrame
             One row per constraint with columns: name, value, satisfied.
         """
         if adjustments is None:
@@ -385,7 +385,7 @@ class RateChangeOptimiser:
                 "satisfied": val >= 0,
             })
 
-        return pd.DataFrame(rows)
+        return pl.DataFrame(rows)
 
     def __repr__(self) -> str:
         constraint_names = [c.name for c in self._constraints]

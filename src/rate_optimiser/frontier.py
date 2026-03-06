@@ -22,7 +22,7 @@ from typing import Optional
 import warnings
 
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from rate_optimiser.optimiser import RateChangeOptimiser, OptimiserResult
 from rate_optimiser.constraints import LossRatioConstraint
@@ -55,7 +55,7 @@ class EfficientFrontier:
     def __init__(self, optimiser: RateChangeOptimiser) -> None:
         self._opt = optimiser
         self._results: list[dict] = []
-        self._df: Optional[pd.DataFrame] = None
+        self._df: Optional[pl.DataFrame] = None
 
     def trace(
         self,
@@ -65,7 +65,7 @@ class EfficientFrontier:
         warm_start: bool = True,
         tol: float = 1e-8,
         maxiter: int = 500,
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """
         Solve the optimisation for each LR target and collect results.
 
@@ -94,7 +94,7 @@ class EfficientFrontier:
 
         Returns
         -------
-        pd.DataFrame
+        pl.DataFrame
             Columns: lr_target, expected_lr, expected_volume, feasible,
             objective_value, shadow_lr, shadow_volume, factor_adjustments.
             Each row is one point on the frontier.
@@ -121,33 +121,44 @@ class EfficientFrontier:
                 x0 = np.array(list(result.factor_adjustments.values()))
 
             rows.append({
-                "lr_target": lr_target,
-                "expected_lr": result.expected_lr,
-                "expected_volume": result.expected_volume,
-                "feasible": result.success,
-                "objective_value": result.objective_value,
-                "shadow_lr": result.shadow_prices.get(lr_constraint_name, 0.0),
-                "shadow_volume": result.shadow_prices.get("volume_lb", 0.0),
+                "lr_target": float(lr_target),
+                "expected_lr": float(result.expected_lr),
+                "expected_volume": float(result.expected_volume),
+                "feasible": bool(result.success),
+                "objective_value": float(result.objective_value),
+                "shadow_lr": float(result.shadow_prices.get(lr_constraint_name, 0.0)),
+                "shadow_volume": float(result.shadow_prices.get("volume_lb", 0.0)),
                 "factor_adjustments": result.factor_adjustments.copy(),
-                "n_iterations": result.n_iterations,
+                "n_iterations": int(result.n_iterations),
             })
 
-        self._df = pd.DataFrame(rows)
         self._results = rows
+        # Build Polars DataFrame (factor_adjustments stored as Python objects)
+        self._df = pl.DataFrame({
+            "lr_target": [r["lr_target"] for r in rows],
+            "expected_lr": [r["expected_lr"] for r in rows],
+            "expected_volume": [r["expected_volume"] for r in rows],
+            "feasible": [r["feasible"] for r in rows],
+            "objective_value": [r["objective_value"] for r in rows],
+            "shadow_lr": [r["shadow_lr"] for r in rows],
+            "shadow_volume": [r["shadow_volume"] for r in rows],
+            "factor_adjustments": [r["factor_adjustments"] for r in rows],
+            "n_iterations": [r["n_iterations"] for r in rows],
+        })
         return self._df
 
     @property
-    def frontier_df(self) -> pd.DataFrame:
+    def frontier_df(self) -> pl.DataFrame:
         """The frontier DataFrame from the most recent trace() call."""
         if self._df is None:
             raise RuntimeError("Call trace() before accessing frontier_df.")
         return self._df
 
-    def feasible_points(self) -> pd.DataFrame:
+    def feasible_points(self) -> pl.DataFrame:
         """Subset of the frontier DataFrame with feasible=True."""
-        return self.frontier_df[self.frontier_df["feasible"]].copy()
+        return self.frontier_df.filter(pl.col("feasible"))
 
-    def shadow_price_summary(self) -> pd.DataFrame:
+    def shadow_price_summary(self) -> pl.DataFrame:
         """
         Summary of shadow prices across the frontier.
 
@@ -157,7 +168,7 @@ class EfficientFrontier:
         one more percentage point of LR improvement?
         """
         df = self.feasible_points()
-        return df[["lr_target", "expected_lr", "expected_volume", "shadow_lr", "shadow_volume"]].copy()
+        return df.select(["lr_target", "expected_lr", "expected_volume", "shadow_lr", "shadow_volume"])
 
     def plot(
         self,

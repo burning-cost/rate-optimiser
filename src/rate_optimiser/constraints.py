@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
 import numpy as np
-import pandas as pd
+import polars as pl
 
 
 class Constraint(ABC):
@@ -38,7 +38,7 @@ class Constraint(ABC):
     def evaluate(
         self,
         adjustments: np.ndarray,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         factor_structure,
         demand_model,
     ) -> float:
@@ -52,7 +52,7 @@ class Constraint(ABC):
         ----------
         adjustments : np.ndarray
             Current factor adjustments (decision variables).
-        data : pd.DataFrame
+        data : pl.DataFrame
             Policy-level data.
         factor_structure : FactorStructure
             Tariff structure for computing adjusted premiums.
@@ -63,7 +63,7 @@ class Constraint(ABC):
     @abstractmethod
     def to_scipy_dict(
         self,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         factor_structure,
         demand_model,
     ) -> dict:
@@ -100,7 +100,7 @@ class LossRatioConstraint(Constraint):
     def evaluate(
         self,
         adjustments: np.ndarray,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         factor_structure,
         demand_model,
     ) -> float:
@@ -155,7 +155,7 @@ class VolumeConstraint(Constraint):
     def evaluate(
         self,
         adjustments: np.ndarray,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         factor_structure,
         demand_model,
     ) -> float:
@@ -292,7 +292,7 @@ class ENBPConstraint(Constraint):
     def evaluate(
         self,
         adjustments: np.ndarray,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         factor_structure,
         demand_model,
     ) -> float:
@@ -310,7 +310,7 @@ class ENBPConstraint(Constraint):
     def _compute_excess(
         self,
         adjustments: np.ndarray,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         factor_structure,
     ) -> np.ndarray:
         """
@@ -318,9 +318,9 @@ class ENBPConstraint(Constraint):
 
         Positive values indicate a violation.
         """
-        renewal_mask = data["renewal_flag"].values.astype(bool)
+        renewal_mask = data["renewal_flag"].to_numpy().astype(bool)
         if self.channels is not None:
-            channel_mask = data["channel"].isin(self.channels).values
+            channel_mask = data["channel"].is_in(self.channels).to_numpy()
             policy_mask = renewal_mask & channel_mask
         else:
             policy_mask = renewal_mask
@@ -328,7 +328,7 @@ class ENBPConstraint(Constraint):
         if not policy_mask.any():
             return np.array([])
 
-        current_premiums = data["current_premium"].values
+        current_premiums = data["current_premium"].to_numpy()
 
         # Renewal premium: apply all factor adjustments
         renewal_adj_product = np.prod(adjustments)  # all factors apply
@@ -366,7 +366,7 @@ class ENBPConstraint(Constraint):
 
 def _compute_adjusted_premiums(
     adjustments: np.ndarray,
-    data: pd.DataFrame,
+    data: pl.DataFrame,
     factor_structure,
 ) -> np.ndarray:
     """
@@ -376,12 +376,12 @@ def _compute_adjusted_premiums(
     the product of all factor adjustment multipliers.
     """
     adj_product = np.prod(adjustments)
-    return data["current_premium"].values * adj_product
+    return data["current_premium"].to_numpy() * adj_product
 
 
 def _compute_renewal_probs(
     adjustments: np.ndarray,
-    data: pd.DataFrame,
+    data: pl.DataFrame,
     factor_structure,
     demand_model,
 ) -> np.ndarray:
@@ -394,9 +394,9 @@ def _compute_renewal_probs(
     adjusted_premiums = _compute_adjusted_premiums(adjustments, data, factor_structure)
 
     if "market_premium" in data.columns:
-        market = data["market_premium"].values
+        market = data["market_premium"].to_numpy()
     else:
-        market = data["technical_premium"].values
+        market = data["technical_premium"].to_numpy()
 
     price_ratio = adjusted_premiums / np.where(market > 0, market, adjusted_premiums)
     probs = demand_model.predict(price_ratio, policy_features=data)
@@ -405,7 +405,7 @@ def _compute_renewal_probs(
 
 def _compute_expected_lr(
     adjustments: np.ndarray,
-    data: pd.DataFrame,
+    data: pl.DataFrame,
     factor_structure,
     demand_model,
 ) -> float:
@@ -419,7 +419,7 @@ def _compute_expected_lr(
     """
     probs = _compute_renewal_probs(adjustments, data, factor_structure, demand_model)
     adjusted_premiums = _compute_adjusted_premiums(adjustments, data, factor_structure)
-    claims = data["technical_premium"].values
+    claims = data["technical_premium"].to_numpy()
 
     expected_claims = np.dot(probs, claims)
     expected_premium = np.dot(probs, adjusted_premiums)
@@ -432,7 +432,7 @@ def _compute_expected_lr(
 
 def _compute_volume_ratio(
     adjustments: np.ndarray,
-    data: pd.DataFrame,
+    data: pl.DataFrame,
     factor_structure,
     demand_model,
 ) -> float:
@@ -451,7 +451,7 @@ def _compute_volume_ratio(
     """
     probs_new = _compute_renewal_probs(adjustments, data, factor_structure, demand_model)
     if "renewal_prob" in data.columns:
-        baseline = float(data["renewal_prob"].values.sum())
+        baseline = float(data["renewal_prob"].to_numpy().sum())
     else:
         baseline = float(len(data))
     if baseline < 1e-10:

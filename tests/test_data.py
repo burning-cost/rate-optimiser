@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
 
 from rate_optimiser.data import PolicyData, FactorStructure, REQUIRED_COLUMNS
@@ -15,20 +15,21 @@ class TestPolicyData:
         assert data.n_policies == len(raw_policy_df)
 
     def test_missing_required_column_raises(self, raw_policy_df):
-        df = raw_policy_df.drop(columns=["technical_premium"])
+        df = raw_policy_df.drop("technical_premium")
         with pytest.raises(ValueError, match="missing required columns"):
             PolicyData(df)
 
     def test_empty_dataframe_raises(self, raw_policy_df):
-        df = raw_policy_df.iloc[:0]
+        df = raw_policy_df.clear()
         with pytest.raises(ValueError, match="empty"):
             PolicyData(df)
 
     def test_renewal_flag_coerced_to_bool(self, raw_policy_df):
-        df = raw_policy_df.copy()
-        df["renewal_flag"] = df["renewal_flag"].astype(int)
+        df = raw_policy_df.with_columns(
+            pl.col("renewal_flag").cast(pl.Int8)
+        )
         data = PolicyData(df)
-        assert data.df["renewal_flag"].dtype == bool
+        assert data.df["renewal_flag"].dtype == pl.Boolean
 
     def test_n_renewals_correct(self, raw_policy_df):
         data = PolicyData(raw_policy_df)
@@ -57,14 +58,19 @@ class TestPolicyData:
         assert 0.50 < lr < 0.95, f"Unexpected LR: {lr}"
 
     def test_validate_demand_outputs_raises_if_missing(self, raw_policy_df):
-        df = raw_policy_df.drop(columns=["renewal_prob"])
+        df = raw_policy_df.drop("renewal_prob")
         data = PolicyData(df)
         with pytest.raises(ValueError, match="renewal_prob"):
             data.validate_demand_outputs()
 
     def test_validate_demand_outputs_raises_if_out_of_range(self, raw_policy_df):
-        df = raw_policy_df.copy()
-        df.loc[0, "renewal_prob"] = 1.5
+        # Set first row's renewal_prob to 1.5
+        df = raw_policy_df.with_columns(
+            pl.when(pl.int_range(pl.len()) == 0)
+            .then(pl.lit(1.5))
+            .otherwise(pl.col("renewal_prob"))
+            .alias("renewal_prob")
+        )
         data = PolicyData(df)
         with pytest.raises(ValueError, match="outside"):
             data.validate_demand_outputs()
@@ -79,14 +85,24 @@ class TestPolicyData:
 
     def test_from_csv_roundtrip(self, raw_policy_df, tmp_path):
         path = tmp_path / "policies.csv"
-        raw_policy_df.to_csv(path, index=False)
+        raw_policy_df.write_csv(path)
         loaded = PolicyData.from_csv(path)
         assert loaded.n_policies == len(raw_policy_df)
 
-    def test_dataframe_is_copied(self, raw_policy_df):
+    def test_dataframe_is_not_mutated_externally(self, raw_policy_df):
+        # Polars DataFrames are immutable; PolicyData stores the passed df
+        # but with_columns on raw_policy_df creates a new df, not mutating PolicyData
         data = PolicyData(raw_policy_df)
-        data.df.loc[data.df.index[0], "current_premium"] = 99999
-        assert raw_policy_df.loc[raw_policy_df.index[0], "current_premium"] != 99999
+        original_premium = data.df["current_premium"][0]
+        # Modifying raw_policy_df externally (by creating a new one) doesn't affect data.df
+        # because Polars frames are immutable
+        new_df = raw_policy_df.with_columns(
+            pl.when(pl.int_range(pl.len()) == 0)
+            .then(pl.lit(99999.0))
+            .otherwise(pl.col("current_premium"))
+            .alias("current_premium")
+        )
+        assert data.df["current_premium"][0] == original_premium
 
 
 class TestFactorStructure:
@@ -97,17 +113,22 @@ class TestFactorStructure:
         with pytest.raises(ValueError, match="missing columns"):
             FactorStructure(
                 factor_names=["factor_age_band", "nonexistent_factor"],
-                factor_values=raw_policy_df[["factor_age_band"]],
+                factor_values=raw_policy_df.select(["factor_age_band"]),
             )
 
     def test_nonpositive_factor_values_raise(self, raw_policy_df, factor_names):
-        df = raw_policy_df[factor_names].copy()
-        df.loc[df.index[0], "factor_age_band"] = -0.5
+        # Set first row's factor_age_band to -0.5
+        df = raw_policy_df.select(factor_names).with_columns(
+            pl.when(pl.int_range(pl.len()) == 0)
+            .then(pl.lit(-0.5))
+            .otherwise(pl.col("factor_age_band"))
+            .alias("factor_age_band")
+        )
         with pytest.raises(ValueError, match="strictly positive"):
             FactorStructure(factor_names=factor_names, factor_values=df)
 
     def test_invalid_renewal_factor_name_raises(self, raw_policy_df, factor_names):
-        df = raw_policy_df[factor_names]
+        df = raw_policy_df.select(factor_names)
         with pytest.raises(ValueError, match="renewal_factor_name"):
             FactorStructure(
                 factor_names=factor_names,

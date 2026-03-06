@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
 
 from rate_optimiser.constraints import (
@@ -201,8 +201,7 @@ class TestENBPConstraint:
         assert val_pcw < 0 or val_direct < 0
 
     def test_no_renewal_policies_returns_zero(self, raw_policy_df, factor_structure, demand_model):
-        df = raw_policy_df.copy()
-        df["renewal_flag"] = False
+        df = raw_policy_df.with_columns(pl.lit(False).alias("renewal_flag"))
         from rate_optimiser.data import PolicyData
         data = PolicyData(df)
         adj = factor_structure.initial_adjustments()

@@ -13,7 +13,7 @@ the caller's GLM/GBM pipeline. We do not refit models here.
 
 from __future__ import annotations
 
-import pandas as pd
+import polars as pl
 import numpy as np
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -41,7 +41,7 @@ class PolicyData:
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pl.DataFrame
         Policy-level DataFrame. Required columns: ``policy_id``, ``channel``,
         ``renewal_flag`` (bool), ``technical_premium`` (float),
         ``current_premium`` (float). Optional but used when present:
@@ -49,31 +49,33 @@ class PolicyData:
         ``claims_variance``.
     """
 
-    df: pd.DataFrame
+    df: pl.DataFrame
 
     def __post_init__(self) -> None:
         missing = REQUIRED_COLUMNS - set(self.df.columns)
         if missing:
             raise ValueError(
                 f"PolicyData is missing required columns: {sorted(missing)}. "
-                f"Present columns: {sorted(self.df.columns.tolist())}"
+                f"Present columns: {sorted(self.df.columns)}"
             )
         if len(self.df) == 0:
             raise ValueError("PolicyData DataFrame cannot be empty.")
-        self.df = self.df.copy()
-        if not pd.api.types.is_bool_dtype(self.df["renewal_flag"]):
-            self.df["renewal_flag"] = self.df["renewal_flag"].astype(bool)
+        # Coerce renewal_flag to bool if necessary
+        if self.df["renewal_flag"].dtype != pl.Boolean:
+            self.df = self.df.with_columns(
+                pl.col("renewal_flag").cast(pl.Boolean)
+            )
 
     @classmethod
     def from_parquet(cls, path: str | Path) -> "PolicyData":
         """Load from a Parquet file. All required columns must be present."""
-        df = pd.read_parquet(path)
+        df = pl.read_parquet(path)
         return cls(df)
 
     @classmethod
     def from_csv(cls, path: str | Path, **kwargs) -> "PolicyData":
         """Load from a CSV file."""
-        df = pd.read_csv(path, **kwargs)
+        df = pl.read_csv(path, **kwargs)
         return cls(df)
 
     @property
@@ -89,17 +91,17 @@ class PolicyData:
     @property
     def channels(self) -> list[str]:
         """Distinct channels present in the data."""
-        return sorted(self.df["channel"].unique().tolist())
+        return sorted(self.df["channel"].unique().to_list())
 
     @property
-    def renewal(self) -> pd.DataFrame:
+    def renewal(self) -> pl.DataFrame:
         """Subset of renewal policies."""
-        return self.df[self.df["renewal_flag"]].copy()
+        return self.df.filter(pl.col("renewal_flag"))
 
     @property
-    def new_business(self) -> pd.DataFrame:
+    def new_business(self) -> pl.DataFrame:
         """Subset of new business policies."""
-        return self.df[~self.df["renewal_flag"]].copy()
+        return self.df.filter(~pl.col("renewal_flag"))
 
     def current_loss_ratio(self) -> float:
         """
@@ -128,12 +130,13 @@ class PolicyData:
                 "Populate it from your demand model before calling the optimiser."
             )
         probs = self.df["renewal_prob"]
-        if probs.isna().any():
+        if probs.is_nan().any() or probs.is_null().any():
             raise ValueError("Column 'renewal_prob' contains NaN values.")
-        if (probs < 0).any() or (probs > 1).any():
+        probs_np = probs.to_numpy()
+        if (probs_np < 0).any() or (probs_np > 1).any():
             raise ValueError(
                 "Column 'renewal_prob' contains values outside [0, 1]. "
-                f"Range found: [{probs.min():.4f}, {probs.max():.4f}]"
+                f"Range found: [{probs_np.min():.4f}, {probs_np.max():.4f}]"
             )
 
     def __repr__(self) -> str:
@@ -162,7 +165,7 @@ class FactorStructure:
     factor_names : sequence of str
         Names of the rating factors. These must match column names in the
         PolicyData DataFrame (after applying the ``factor_col_prefix``).
-    factor_values : pd.DataFrame
+    factor_values : pl.DataFrame
         DataFrame with one row per policy (in the same order as PolicyData.df)
         and one column per factor containing the current relativity value for
         that policy. These are the multiplicative factor values, not the raw
@@ -177,7 +180,7 @@ class FactorStructure:
     """
 
     factor_names: list[str]
-    factor_values: pd.DataFrame
+    factor_values: pl.DataFrame
     factor_col_prefix: str = ""
     renewal_factor_names: list[str] = field(default_factory=list)
 
@@ -190,7 +193,9 @@ class FactorStructure:
                 f"factor_values DataFrame is missing columns for factors: "
                 f"{sorted(missing)}"
             )
-        if (self.factor_values[self.factor_names] <= 0).any().any():
+        # Check all factor values are strictly positive
+        factor_vals = self.factor_values.select(self.factor_names).to_numpy()
+        if (factor_vals <= 0).any():
             raise ValueError(
                 "All factor values must be strictly positive (multiplicative relativities)."
             )
@@ -240,7 +245,7 @@ class FactorStructure:
         np.ndarray
             Shape (n_policies,). Adjusted premiums.
         """
-        factor_vals = self.factor_values[self.factor_names].values  # (n, k)
+        factor_vals = self.factor_values.select(self.factor_names).to_numpy()  # (n, k)
         adj = adjustments.copy()
         if factor_mask is not None:
             adj = np.where(factor_mask, adj, 1.0)

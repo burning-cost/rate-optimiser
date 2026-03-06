@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
 
 from rate_optimiser.frontier import EfficientFrontier
@@ -26,7 +26,7 @@ class TestEfficientFrontier:
     def test_trace_returns_dataframe(self, frontier_optimiser):
         ef = EfficientFrontier(frontier_optimiser)
         df = ef.trace(lr_range=(0.70, 0.80), n_points=5)
-        assert isinstance(df, pd.DataFrame)
+        assert isinstance(df, pl.DataFrame)
 
     def test_trace_has_required_columns(self, frontier_optimiser):
         ef = EfficientFrontier(frontier_optimiser)
@@ -49,16 +49,16 @@ class TestEfficientFrontier:
     def test_feasible_points_at_relaxed_bounds(self, frontier_optimiser):
         ef = EfficientFrontier(frontier_optimiser)
         df = ef.trace(lr_range=(0.72, 0.80), n_points=5)
-        feasible = df[df["feasible"]]
+        feasible = df.filter(pl.col("feasible"))
         assert len(feasible) > 0, "Expected at least some feasible frontier points"
 
     def test_volume_decreases_as_lr_tightens(self, frontier_optimiser):
         ef = EfficientFrontier(frontier_optimiser)
         df = ef.trace(lr_range=(0.70, 0.80), n_points=8)
-        feasible = df[df["feasible"]].sort_values("lr_target", ascending=False)
+        feasible = df.filter(pl.col("feasible")).sort("lr_target", descending=True)
         if len(feasible) >= 3:
             # As LR target decreases (tighter), volume should tend to decrease
-            vols = feasible["expected_volume"].values
+            vols = feasible["expected_volume"].to_numpy()
             # At least the general trend should be downward
             # (not strictly monotone due to solver noise)
             assert vols[0] >= vols[-1] - 0.05, (
@@ -68,7 +68,7 @@ class TestEfficientFrontier:
     def test_shadow_lr_is_numeric(self, frontier_optimiser):
         ef = EfficientFrontier(frontier_optimiser)
         df = ef.trace(lr_range=(0.72, 0.80), n_points=5)
-        assert df["shadow_lr"].dtype in [np.float64, float]
+        assert df["shadow_lr"].dtype in [pl.Float64, pl.Float32]
 
     def test_frontier_df_property_raises_before_trace(self, frontier_optimiser):
         ef = EfficientFrontier(frontier_optimiser)
@@ -79,7 +79,7 @@ class TestEfficientFrontier:
         ef = EfficientFrontier(frontier_optimiser)
         ef.trace(lr_range=(0.72, 0.80), n_points=4)
         df = ef.frontier_df
-        assert isinstance(df, pd.DataFrame)
+        assert isinstance(df, pl.DataFrame)
 
     def test_feasible_points_method(self, frontier_optimiser):
         ef = EfficientFrontier(frontier_optimiser)
@@ -117,5 +117,5 @@ class TestEfficientFrontier:
         df = ef.trace(lr_range=(0.72, 0.80), n_points=4)
         assert "factor_adjustments" in df.columns
         # Should be a dict in each row
-        for adj in df["factor_adjustments"]:
+        for adj in df["factor_adjustments"].to_list():
             assert isinstance(adj, dict)

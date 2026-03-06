@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import polars as pl
 import pytest
 
 from rate_optimiser.optimiser import RateChangeOptimiser, OptimiserResult
@@ -99,6 +100,7 @@ class TestRateChangeOptimiser:
 
     def test_feasibility_report_returns_dataframe(self, basic_optimiser):
         report = basic_optimiser.feasibility_report()
+        assert isinstance(report, pl.DataFrame)
         assert "constraint" in report.columns
         assert "value" in report.columns
         assert "satisfied" in report.columns
@@ -109,9 +111,9 @@ class TestRateChangeOptimiser:
         opt = RateChangeOptimiser(data=policy_data, demand=demand_model, factor_structure=factor_structure)
         opt.add_constraint(LossRatioConstraint(bound=0.60))  # tight: violated at identity
         report = opt.feasibility_report()
-        lr_row = report[report["constraint"] == "loss_ratio_ub"]
+        lr_row = report.filter(pl.col("constraint") == "loss_ratio_ub")
         assert len(lr_row) == 1
-        assert not lr_row.iloc[0]["satisfied"]
+        assert not lr_row["satisfied"][0]
 
     def test_repr(self, basic_optimiser):
         r = repr(basic_optimiser)
@@ -150,7 +152,7 @@ class TestRateChangeOptimiser:
             )
 
     def test_validate_demand_called_on_init(self, raw_policy_df, demand_model, factor_structure, factor_names):
-        df = raw_policy_df.drop(columns=["renewal_prob"])
+        df = raw_policy_df.drop("renewal_prob")
         from rate_optimiser.data import PolicyData
         data = PolicyData(df)
         with pytest.raises(ValueError, match="renewal_prob"):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
 from scipy.special import expit
 
@@ -49,8 +49,8 @@ class TestDemandModel:
     def test_tenure_increases_renewal_probability(self):
         params = LogisticDemandParams(intercept=1.0, price_coef=-2.0, tenure_coef=0.2)
         dm = make_logistic_demand(params)
-        low_tenure = pd.DataFrame({"tenure": [0]})
-        high_tenure = pd.DataFrame({"tenure": [10]})
+        low_tenure = pl.DataFrame({"tenure": [0]})
+        high_tenure = pl.DataFrame({"tenure": [10]})
         ratio = np.array([1.0])
         p_low = dm.predict(ratio, low_tenure)[0]
         p_high = dm.predict(ratio, high_tenure)[0]

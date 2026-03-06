@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from typing import Optional
 import numpy as np
-import pandas as pd
+import polars as pl
 
 
 def plot_frontier(
-    frontier_df: pd.DataFrame,
+    frontier_df: pl.DataFrame,
     ax=None,
     show_shadow_prices: bool = True,
     feasible_color: str = "#1f77b4",
@@ -31,7 +31,7 @@ def plot_frontier(
 
     Parameters
     ----------
-    frontier_df : pd.DataFrame
+    frontier_df : pl.DataFrame
         Output of EfficientFrontier.trace(). Must have columns: expected_lr,
         expected_volume, feasible.
     ax : matplotlib Axes, optional
@@ -61,13 +61,13 @@ def plot_frontier(
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 5))
 
-    feasible = frontier_df[frontier_df["feasible"]]
-    infeasible = frontier_df[~frontier_df["feasible"]]
+    feasible = frontier_df.filter(pl.col("feasible"))
+    infeasible = frontier_df.filter(~pl.col("feasible"))
 
     if len(feasible) > 0:
         ax.plot(
-            feasible["expected_lr"],
-            feasible["expected_volume"],
+            feasible["expected_lr"].to_numpy(),
+            feasible["expected_volume"].to_numpy(),
             "-o",
             color=feasible_color,
             linewidth=2,
@@ -78,8 +78,8 @@ def plot_frontier(
 
     if len(infeasible) > 0:
         ax.scatter(
-            infeasible["expected_lr"],
-            infeasible["expected_volume"],
+            infeasible["expected_lr"].to_numpy(),
+            infeasible["expected_volume"].to_numpy(),
             marker="x",
             color=infeasible_color,
             s=50,
@@ -89,10 +89,13 @@ def plot_frontier(
         )
 
     if annotate_shadow and "shadow_lr" in feasible.columns and len(feasible) > 0:
-        for _, row in feasible.iterrows():
+        lr_vals = feasible["expected_lr"].to_numpy()
+        vol_vals = feasible["expected_volume"].to_numpy()
+        shadow_vals = feasible["shadow_lr"].to_numpy()
+        for lr, vol, shadow in zip(lr_vals, vol_vals, shadow_vals):
             ax.annotate(
-                f"{row['shadow_lr']:.3f}",
-                xy=(row["expected_lr"], row["expected_volume"]),
+                f"{shadow:.3f}",
+                xy=(lr, vol),
                 xytext=(4, 4),
                 textcoords="offset points",
                 fontsize=7,
@@ -107,7 +110,8 @@ def plot_frontier(
 
     # Flip x-axis: lower LR is better (tighter target), shown on right
     if len(feasible) > 0:
-        x_min, x_max = feasible["expected_lr"].min(), feasible["expected_lr"].max()
+        lr_arr = feasible["expected_lr"].to_numpy()
+        x_min, x_max = lr_arr.min(), lr_arr.max()
         margin = (x_max - x_min) * 0.05 if x_max > x_min else 0.01
         ax.set_xlim(x_max + margin, x_min - margin)
 
@@ -172,7 +176,7 @@ def plot_factor_adjustments(
 
 
 def plot_shadow_prices(
-    frontier_df: pd.DataFrame,
+    frontier_df: pl.DataFrame,
     ax=None,
     title: str = "Shadow Price on LR Constraint",
 ) -> "matplotlib.axes.Axes":
@@ -186,7 +190,7 @@ def plot_shadow_prices(
 
     Parameters
     ----------
-    frontier_df : pd.DataFrame
+    frontier_df : pl.DataFrame
         Output of EfficientFrontier.trace().
     ax : matplotlib Axes, optional
     title : str
@@ -203,15 +207,15 @@ def plot_shadow_prices(
     if ax is None:
         fig, ax = plt.subplots(figsize=(7, 4))
 
-    feasible = frontier_df[frontier_df["feasible"]].copy()
+    feasible = frontier_df.filter(pl.col("feasible"))
 
     if "shadow_lr" not in feasible.columns or len(feasible) == 0:
         ax.text(0.5, 0.5, "No shadow price data available.", transform=ax.transAxes, ha="center")
         return ax
 
     ax.plot(
-        feasible["lr_target"],
-        feasible["shadow_lr"].abs(),
+        feasible["lr_target"].to_numpy(),
+        np.abs(feasible["shadow_lr"].to_numpy()),
         "-o",
         color="#ff7f0e",
         linewidth=2,
