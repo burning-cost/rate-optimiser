@@ -202,7 +202,7 @@ class EfficientFrontier:
             import matplotlib.pyplot as plt
         except ImportError:
             raise ImportError(
-                "matplotlib is required for plotting. Install it with: uv pip install matplotlib"
+                "matplotlib is required for plotting. Install it with: uv add matplotlib"
             )
 
         from rate_optimiser.plotting import plot_frontier
