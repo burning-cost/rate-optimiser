@@ -51,8 +51,8 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/burningcost/rate-optimiser"
-Issues = "https://github.com/burningcost/rate-optimiser/issues"
+Repository = "https://github.com/burning-cost/rate-optimiser"
+Issues = "https://github.com/burning-cost/rate-optimiser/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rate_optimiser"]
