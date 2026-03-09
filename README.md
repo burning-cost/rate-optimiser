@@ -1,7 +1,8 @@
 # rate-optimiser
-[![Tests](https://github.com/burning-cost/rate-optimiser/actions/workflows/tests.yml/badge.svg)](https://github.com/burning-cost/rate-optimiser/actions/workflows/tests.yml)
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![PyPI](https://img.shields.io/pypi/v/rate-optimiser)
+[![Tests](https://github.com/burning-cost/rate-optimiser/actions/workflows/tests.yml/badge.svg)](https://github.com/burning-cost/rate-optimiser/actions/workflows/tests.yml)
+[![PyPI](https://img.shields.io/pypi/v/rate-optimiser)](https://pypi.org/project/rate-optimiser/)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
 Constrained rate change optimiser for UK personal lines insurance pricing.
 
@@ -19,7 +20,7 @@ A UK motor pricing team wants to take +3.5% rate on renewal. Before submitting t
 2. Does the proposed strategy hit the LR target without breaching the volume budget?
 3. Is the renewal price compliant with FCA PS21/5 (no renewal exceeds NB equivalent)?
 
-Current tooling forces them to hand-code scenarios in Excel or run ad hoc simulations. The efficient frontier - the full set of achievable (LR, volume) outcomes - is never computed. Shadow prices on constraints (what is a 1pp LR improvement actually worth in volume terms?) are unknown.
+Current tooling forces them to hand-code scenarios in Excel or run ad hoc simulations. The efficient frontier — the full set of achievable (LR, volume) outcomes — is never computed. Shadow prices on constraints (what is a 1pp LR improvement actually worth in volume terms?) are unknown.
 
 This library solves those three questions formally. You specify constraints, it finds the minimum-dislocation rate strategy that satisfies them, and it maps the entire frontier so you can see what trade-offs you are making.
 
@@ -137,13 +138,13 @@ print(frontier.shadow_price_summary())
       0.68        0.680            0.937       0.72           0.08
 ```
 
-The `shadow_lr` column is the Lagrange multiplier on the LR constraint: the marginal dislocation cost of a one-unit tightening of the target. A rising shadow price signals you are approaching the frontier's knee - the point where further LR improvement costs disproportionate volume. That is a number worth putting in front of a commercial director.
+The `shadow_lr` column is the Lagrange multiplier on the LR constraint: the marginal dislocation cost of a one-unit tightening of the target. A rising shadow price signals you are approaching the frontier's knee — the point where further LR improvement costs disproportionate volume. That is a number worth putting in front of a commercial director.
 
 ---
 
 ## Stochastic formulation (Branda approach)
 
-The deterministic constraint E[LR] <= target uses point estimates of claims. The stochastic formulation requires P(LR <= target) >= alpha - the LR must stay below the target with confidence level alpha.
+The deterministic constraint E[LR] <= target uses point estimates of claims. The stochastic formulation requires P(LR <= target) >= alpha — the LR must stay below the target with confidence level alpha.
 
 Reformulated via normal approximation (appropriate for large books):
 
@@ -183,7 +184,7 @@ PS21/5 prohibits renewal premiums above the NB equivalent through the same chann
 opt.add_constraint(ENBPConstraint(channels=["PCW", "direct"]))
 ```
 
-The constraint is channel-specific, as the regulation requires. The shadow price tells you the cost (in objective terms) of the regulatory constraint - how much additional dislocation the insurer incurs to comply. This is directly relevant to PS21/5 impact analyses.
+The constraint is channel-specific, as the regulation requires. The shadow price tells you the cost (in objective terms) of the regulatory constraint — how much additional dislocation the insurer incurs to comply. This is directly relevant to PS21/5 impact analyses.
 
 The NB-equivalent is computed by applying all factor adjustments excluding renewal-only factors (e.g., tenure discounts, NCB-at-renewal). Declare renewal-only factors in the `FactorStructure`:
 
@@ -222,11 +223,11 @@ subject to E[LR(m)] <= LR_target
            pi_i^renewal <= pi_i^NB_equiv  (ENBP)
 ```
 
-Decision variables `m_k` are multiplicative adjustments to each rating factor's relativities. A value of 1.05 means factor k's relativities are uniformly scaled up by 5% - a parallel shift on the log scale.
+Decision variables `m_k` are multiplicative adjustments to each rating factor's relativities. A value of 1.05 means factor k's relativities are uniformly scaled up by 5% — a parallel shift on the log scale.
 
 The demand model enters through the volume and LR constraints: `p_i(pi_i / pi_market_i)` is the probability that policy i renews at the adjusted premium. This makes both constraints nonlinear in `m`, which is why the problem requires SLSQP or a similar nonlinear solver.
 
-The efficient frontier is traced by solving this problem for a range of `LR_target` values and collecting the resulting (expected_LR, expected_volume) pairs - directly analogous to the Markowitz frontier construction.
+The efficient frontier is traced by solving this problem for a range of `LR_target` values and collecting the resulting (expected_LR, expected_volume) pairs — directly analogous to the Markowitz frontier construction.
 
 ### Academic foundations
 
@@ -250,45 +251,24 @@ Tests run on Databricks (see repo CI); do not run locally on resource-constraine
 
 ---
 
-## Other Burning Cost libraries
+## Read more
 
-**Model building**
+[Constrained Rate Optimisation and the Efficient Frontier](https://burning-cost.github.io/2026/03/06/constrained-rate-optimisation-efficient-frontier.html) — why single-scenario Excel pricing cannot find the efficient frontier, and how constrained optimisation does.
 
-| Library | Description |
-|---------|-------------|
-| [shap-relativities](https://github.com/burningcost/shap-relativities) | Extract rating relativities from GBMs using SHAP |
-| [insurance-interactions](https://github.com/burningcost/insurance-interactions) | Automated GLM interaction detection via CANN and NID scores |
-| [insurance-cv](https://github.com/burningcost/insurance-cv) | Walk-forward cross-validation respecting IBNR structure |
-
-**Uncertainty quantification**
+## Related libraries
 
 | Library | Description |
 |---------|-------------|
-| [insurance-conformal](https://github.com/burningcost/insurance-conformal) | Distribution-free prediction intervals for Tweedie models |
-| [bayesian-pricing](https://github.com/burningcost/bayesian-pricing) | Hierarchical Bayesian models for thin-data segments |
-| [credibility](https://github.com/burningcost/credibility) | Bühlmann-Straub credibility weighting |
+| [insurance-demand](https://github.com/burning-cost/insurance-demand) | Conversion, retention, and price elasticity modelling — provides the demand inputs this library requires |
+| [insurance-optimise](https://github.com/burning-cost/insurance-optimise) | Policy-level constrained optimisation — operates on individual policies rather than rating factors; the two approaches are complementary |
+| [shap-relativities](https://github.com/burning-cost/shap-relativities) | Extract rating relativities from GBMs — use to interpret which factor adjustments are GBM-consistent |
+| [insurance-interactions](https://github.com/burning-cost/insurance-interactions) | GLM interaction detection — when rating factors need restructuring before optimisation |
+| [insurance-monitoring](https://github.com/burning-cost/insurance-monitoring) | Model monitoring — informs when the rate strategy needs refreshing |
+| [insurance-causal-policy](https://github.com/burning-cost/insurance-causal-policy) | SDID causal evaluation — after executing the rate change, use this to prove it achieved the intended effect |
+| [insurance-fairness](https://github.com/burning-cost/insurance-fairness) | Proxy discrimination auditing — Consumer Duty fair value checks on optimised rates |
+| [insurance-spatial](https://github.com/burning-cost/insurance-spatial) | BYM2 spatial territory ratemaking — territory factor adjustments feed into this optimiser |
 
-**Deployment and optimisation**
-
-| Library | Description |
-|---------|-------------|
-| [insurance-demand](https://github.com/burningcost/insurance-demand) | Conversion, retention, and price elasticity modelling |
-
-**Governance**
-
-| Library | Description |
-|---------|-------------|
-| [insurance-fairness](https://github.com/burningcost/insurance-fairness) | Proxy discrimination auditing for UK insurance models |
-| [insurance-causal](https://github.com/burningcost/insurance-causal) | Double Machine Learning for causal pricing inference |
-| [insurance-monitoring](https://github.com/burningcost/insurance-monitoring) | Model monitoring: PSI, A/E ratios, Gini drift test |
-
-**Spatial**
-
-| Library | Description |
-|---------|-------------|
-| [insurance-spatial](https://github.com/burningcost/insurance-spatial) | BYM2 spatial territory ratemaking for UK personal lines |
-
-[All libraries →](https://burningcost.github.io)
+[All Burning Cost libraries →](https://burning-cost.github.io)
 
 ---
 
