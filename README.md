@@ -1,4 +1,5 @@
 # rate-optimiser
+[![Tests](https://github.com/burning-cost/rate-optimiser/actions/workflows/tests.yml/badge.svg)](https://github.com/burning-cost/rate-optimiser/actions/workflows/tests.yml)
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![PyPI](https://img.shields.io/pypi/v/rate-optimiser)
 
