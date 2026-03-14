@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "rate-optimiser"
+abstract: >
+  Constrained portfolio rate optimisation for insurance pricing. Solves the
+  joint pricing problem subject to FCA ENBP (Equivalent New Business Pricing)
+  constraints, demand elasticity models, and efficient frontier analysis.
+  Produces JSON audit trails for regulatory sign-off.
+authors:
+  - name: "Burning Cost"
+    website: "https://burning-cost.github.io"
+repository-code: "https://github.com/burning-cost/rate-optimiser"
+license: MIT
+keywords:
+  - insurance-pricing
+  - actuarial
+  - rate-optimisation
+  - fca
+  - enbp
+  - demand-modelling
+  - constrained-optimisation
+  - efficient-frontier
