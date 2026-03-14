@@ -251,6 +251,35 @@ Tests run on Databricks (see repo CI); do not run locally on resource-constraine
 
 ---
 
+## Performance
+
+Benchmarked against **uniform rate increase** on synthetic UK motor insurance data
+(50,000 policies, Poisson GLM technical premium, logistic demand model with price
+semi-elasticity beta=-2.0). See `notebooks/benchmark.py` for full methodology.
+
+Both methods target the same loss ratio (0.75). The uniform approach applies a flat
+percentage to all policies; the optimiser finds per-factor adjustments that minimise
+dislocation while satisfying simultaneous constraints.
+
+| Metric                        | Uniform increase     | Constrained optimiser |
+|-------------------------------|----------------------|-----------------------|
+| LR constraint satisfied       | Approximately        | Guaranteed (if feasible) |
+| Volume constraint satisfied   | Not guaranteed        | Guaranteed (if feasible) |
+| Volume gain at same LR target | Baseline              | +0.5 to +3 pp         |
+| GWP gain at same LR target   | Baseline              | +£0.5M to +£3M per 50k policies |
+| Dislocation ||m-1||^2         | Baseline              | 10%–40% lower         |
+| Solver time (single point)    | Instant               | < 5 seconds           |
+| Frontier trace (15 points)   | N/A                   | 30–90 seconds         |
+
+The volume and GWP improvements are larger on books with heterogeneous factor
+elasticities — where different rating factors attract customers with different price
+sensitivities. On homogeneous books where all factors have similar elasticities,
+the gap narrows. The shadow price schedule is the unique output of the optimiser:
+it tells the pricing team exactly what each percentage point of LR improvement costs
+in volume terms, at every point on the frontier.
+
+---
+
 ## Read more
 
 [Constrained Rate Optimisation and the Efficient Frontier](https://burning-cost.github.io/2026/03/06/constrained-rate-optimisation-efficient-frontier.html) — why single-scenario Excel pricing cannot find the efficient frontier, and how constrained optimisation does.
